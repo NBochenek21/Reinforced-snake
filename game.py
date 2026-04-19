@@ -20,7 +20,11 @@ class SnakeGame:
         self.direction = (1, 0) 
         self.food = None # pozycja jedzenia (krotka)
         self.done = False # czy gra się skończyła
+        self.score = 0
+        self.steps_since_food = 0
         self._place_food()
+        return self.get_state()
+
 
     def _place_food(self):
         #losowe dopóki nie trafi na puste pole
@@ -41,10 +45,13 @@ class SnakeGame:
         new_head = (head[0] + self.direction[0],
                     head[1] + self.direction[1])
         
+        self.steps_since_food += 1
+        
         #3. sprawdzamy kolizje
-        if self._is_collision(new_head):
+        if self._is_collision(new_head) or self.steps_since_food > 100 * len(self.snake):
             self.done = True #jak jest no to end
-            return
+            reward = -10
+            return self.get_state(), reward, self.done
         
 
         #4. nowa głowa na początek losty
@@ -53,8 +60,14 @@ class SnakeGame:
         #5. sprawdzamy czy zjedlismy jedzenie
         if new_head == self.food:
             self._place_food() #jesli tak to nowe jedzenie
+            self.score += 1
+            self.steps_since_food = 0
+            reward = 10
         else:
             self.snake.pop() #jesli nie to usuwamy ogon
+            reward = 0
+
+        return self.get_state(), reward, self.done
 
     def _turn(self, action):
             '''
@@ -91,6 +104,48 @@ class SnakeGame:
         will_grow = (pos == self.food)
         body = self.snake if will_grow else self.snake[:-1]
         return pos in body
+    
+    def get_state(self):
+        '''
+        Zwraca 11 cech opisujących stan gry z perspektywy węża.
+        Każda cecha to 0 lub 1 (False/True zamienione na float).
+
+        [0-2]  niebezpieczeństwo: prosto, w prawo, w lewo
+        [3-6]  kierunek węża: lewo, prawo, góra, dół (one-hot)
+        [7-10] jedzenie względem głowy: lewo, prawo, góra, dół
+        '''
+        head = self.snake[0]
+        dx, dy = self.direction
+
+        # wektory kierunkowe, te same wzory co w _turn
+        dir_right = (-dy, dx)
+        dir_left  = (dy, -dx)
+
+        #pola o jeden krok w każdą stronę
+        ahead = (head[0] + dx,           head[1] + dy)
+        right = (head[0] + dir_right[0], head[1] + dir_right[1])
+        left  = (head[0] + dir_left[0],  head[1] + dir_left[1])
+
+        state = [
+            # grupa 1: niebezpieczeństwo
+            self._is_collision(ahead),
+            self._is_collision(right),
+            self._is_collision(left),
+
+            # grupa 2: kierunek (one-hot)
+            dx == -1,   # lewo
+            dx == 1,    # prawo
+            dy == -1,   # góra
+            dy == 1,    # dół
+
+            # grupa 3: gdzie jedzenie
+            self.food[0] < head[0],   # jedzenie na lewo
+            self.food[0] > head[0],   # jedzenie na prawo
+            self.food[1] < head[1],   # jedzenie wyżej (mniejsze y = wyżej)
+            self.food[1] > head[1],   # jedzenie niżej
+        ]
+
+        return state
 
     def __str__ (self):
         '''
@@ -126,53 +181,66 @@ class SnakeGame:
         #ramka
         border = '+' + '-' * (self.size * 2 - 1) + '+' #kazdy znak na planszy zajmuje 2 pozycje (znak + spacja) więc szerokość to size * 2 - 1 (bo ostatni znak nie ma spacji)
         body = '\n'.join('|' + row + '|' for row in rows) # generator który dodaje ramkę z lewej i prawej strony do każdego wiersza
-        return f"{border}\n{body}\n{border} \nlen: {len(self.snake)}  status: {self.done}"
+        return f"{border}\n{body}\n{border}\nscore: {self.score}  len: {len(self.snake)}  done: {self.done}"
 
+KEYS = {
+    'w': (0, -1),
+    's': (0,  1),
+    'a': (-1, 0),
+    'd': (1,  0),
+}
+
+def absolute_to_relative(current_dir, desired_dir):
+    '''
+    Tłumaczy kierunek absolutny (WSAD) na akcję względną (0/1/2).
+    Kierunek przeciwny do obecnego jest ignorowany (zwraca 0 = prosto).
+    '''
+    if desired_dir == current_dir:
+        return 0
+    dx, dy = current_dir
+    right = (-dy, dx)
+    left  = (dy, -dx)
+    if desired_dir == right:
+        return 1
+    if desired_dir == left:
+        return 2
+    return 0
 
 
 if __name__ == "__main__":
+    import sys
 
-    # mapowanie WSAD na wektory kierunku absolutnego
-    KEYS = {
-        'w': (0, -1),   # góra
-        's': (0,  1),   # dół
-        'a': (-1, 0),   # lewo
-        'd': (1,  0),   # prawo
-    }
+    mode = sys.argv[1] if len(sys.argv) > 1 else "play"
 
-    def absolute_to_relative(current_dir, desired_dir):
-        '''
-        Zamienia "chcę iść w tym absolutnym kierunku" na akcję względną
-        (0=prosto, 1=skręć w prawo, 2=skręć w lewo) względem obecnego
-        kierunku węża. Jeśli gracz wciska kierunek przeciwny do obecnego
-        (czyli "wróć w siebie") - ignorujemy i jedziemy prosto.
-        - dla sieci nie będzie to miało znaczenia dalej są 3 klasy akcji.
-        '''
-        if desired_dir == current_dir:
-            return 0  # nic nie zmieiamy - prosto
-        dx, dy = current_dir
-        right = (-dy, dx)   # wektor po skręcie w prawo
-        left  = (dy, -dx)   # wektor po skręcie w lewo
-        if desired_dir == right:
-            return 1   #gracz chce iść tam gdzie zaprowadziłby skręt w prawo
-        if desired_dir == left:
-            return 2   #analogicznie dla lewej
-        return 0  # przeciwny kierunek - ignorujemy
-
-    game = SnakeGame(size=10)
-    print(game)
-    print('\nSterowanie: WSAD   wyjście: q')
-
-    while not game.done:
-        cmd = input('> ').strip().lower()
-        if cmd == 'q':
-            break
-        if cmd not in KEYS:
-            print('Nieznana komenda!')
-            continue
-
-        action = absolute_to_relative(game.direction, KEYS[cmd])
-        game.step(action)
+    if mode == "play":
+        game = SnakeGame(size=10)
         print(game)
+        print('\nSterowanie: WSAD   wyjście: q')
 
-    print('Koniec gry!')
+        while not game.done:
+            cmd = input('> ').strip().lower()
+            if cmd == 'q':
+                break
+            if cmd not in KEYS:
+                print('Nieznana komenda!')
+                continue
+            action = absolute_to_relative(game.direction, KEYS[cmd])
+            game.step(action)
+            print(game)
+
+        print('Koniec gry!')
+
+    elif mode == "test":
+        game = SnakeGame(size=10)
+        state = game.reset()
+        print(game)
+        print(f"stan startowy: {[int(s) for s in state]}")
+
+        actions = [0, 0, 0, 1, 0, 0]
+        for i, action in enumerate(actions):
+            state, reward, done = game.step(action)
+            print(f"krok {i+1}: action={action}  reward={reward:+d}  done={done}  len={len(game.snake)}")
+            if done:
+                break
+        print()
+        print(game)
