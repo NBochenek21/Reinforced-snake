@@ -1,12 +1,23 @@
 import random
 
+'''
+To jest środowisko (env) niezależne od reszty aplikacji,
+dzięki temu można podpiąc do tej samej gry człowieka z klawiatury,
+AI lub inny algorytm sterujący wężem.
+
+'''
+
 class SnakeGame:
+    #konstruktor planszy - odrazu reset - zawsze gotowy do użycia od
+    #momentu stworzenia obiektu
     def __init__(self, size = 10):
         self.size = size
         self.reset()
 
     def reset(self):
         '''
+        Ustawia gre w stan początkowy - wywołwane przy tworzeniu gry
+
         -wąż zaczyna na srodku z długością 1
         - prawo  = ( 1,  0)       x +1, y bez zmian
             lewo   = (-1,  0)     x -1, y bez zmian
@@ -15,18 +26,19 @@ class SnakeGame:
             
         
         '''
-        cx, cy = self.size // 2, self.size // 2
+        cx, cy = self.size // 2, self.size // 2 # // - dzielenie całkowite, zawsze zwraca int
         self.snake = [(cx, cy)] # lista a nie set bo głowa to [0] dlatego ma znaczenie kolejnosc
         self.direction = (1, 0) 
         self.food = None # pozycja jedzenia (krotka)
-        self.done = False # czy gra się skończyła
+        self._place_food()
         self.score = 0
         self.steps_since_food = 0
-        self._place_food()
+        self.done = False # czy gra się skończyła
+        
         return self.get_state()
 
 
-    def _place_food(self):
+    def _place_food(self): #metoda prywatna - nie wywołujemy jej z zewnatrz klasy) 
         #losowe dopóki nie trafi na puste pole
         while True:
             pos = (random.randint(0, self.size - 1), random.randint(0, self.size - 1)) #losujemy od 0 do 9
@@ -41,9 +53,9 @@ class SnakeGame:
         self._turn(action)
 
         #2. liczmy nowa pozycje glowy
-        head = self.snake[0]
-        new_head = (head[0] + self.direction[0],
-                    head[1] + self.direction[1])
+        head = self.snake[0] 
+        new_head = (head[0] + self.direction[0], #x + dx
+                    head[1] + self.direction[1]) #y + dy
         
         self.steps_since_food += 1
         
@@ -72,16 +84,33 @@ class SnakeGame:
     def _turn(self, action):
             '''
             Obrót wektora kierunku (dx, dy) o 90°.
-            Konwencja: x rośnie w prawo, y rośnie w dół (jak w pygame).
+            Konwencja: x rośnie w prawo, y rośnie w dół (tak jest w  pygame)
 
             Skręt w prawo: (dx, dy) to (-dy, dx)
             Skręt w lewo:  (dx, dy) to (dy, -dx)
 
-            Sprawdzenie skrętu w prawo:
-                prawo (1, 0)  -> ( 0,  1) = dół
-                dół   (0, 1)  -> (-1,  0) = lewo
-                lewo (-1, 0)  -> ( 0, -1) = góra
-                góra  (0,-1)  -> ( 1,  0) = prawo
+                        x 
+                0   1   2   3
+            0   .   .   .   .
+          y 1   .   .   .   .
+            2   .   .   .   .
+            3   .   .   .   .
+
+            skręt w prawo sposobem geometrycznym (najłatwiej pomyslec o strzalce na kartce papieru):
+                prawo (1, 0)  - przesuń x o + 1, y bez zmian
+                lewo (-1, 0)  - przesuń x o - 1, y bez zmian
+                dół   (0, 1)  - przesuń y o + 1, x bez zmian
+                góra  (0,-1)  - przesuń y o - 1, x bez zmian
+
+                PRZED   i  PO
+                (1, 0)  na  (0, 1)      prawo na dół
+                (0, 1)  na  (-1, 0)     dół na lewo
+                (-1, 0) na  (0, -1)     lewo na góra
+                (0, -1) na  (1, 0)      góra na prawo
+
+                z tego wynika wzor:
+                nowy_dx = -dy
+                nowy_dy = dx        
 
             '''
             dx, dy = self.direction
@@ -96,13 +125,13 @@ class SnakeGame:
 
     def _is_collision(self, pos):
         x, y = pos
-        # ściana
+        # sprawdza dwa rodzaje smierci  - sciana i wlasne cialo
         if x < 0 or x >= self.size or y < 0 or y >= self.size:
             return True
-        # własne ciało — z wyjątkiem ogona, który zaraz zniknie
-        # (ale tylko jeśli wąż NIE rośnie w tej klatce)
+        # tu sprawdzenie czy glowa nie jest w cielie
+        # jesli waz rosnie to ogon zostaje - cały, jesli nie rośnie to bez ostatniego segmentu
         will_grow = (pos == self.food)
-        body = self.snake if will_grow else self.snake[:-1]
+        body = self.snake if will_grow else self.snake[:-1] 
         return pos in body
     
     def get_state(self):
@@ -110,9 +139,11 @@ class SnakeGame:
         Zwraca 11 cech opisujących stan gry z perspektywy węża.
         Każda cecha to 0 lub 1 (False/True zamienione na float).
 
-        [0-2]  niebezpieczeństwo: prosto, w prawo, w lewo
+        [0-2]  niebezpieczeństwo: prosto, w prawo, w lewo - cechy wzgledne - siec nie musi uczyc sie rozumiec co to jest prawo czy lewo, tylko czy w tym kierunku jest niebezpiecznie
         [3-6]  kierunek węża: lewo, prawo, góra, dół (one-hot)
         [7-10] jedzenie względem głowy: lewo, prawo, góra, dół
+        [11-12] znormalizowana odległość do jedzenia (dx, dy)
+        [13-15] znormalizowana odległość do ściany: prosto, w prawo, w lewo
         '''
         head = self.snake[0]
         dx, dy = self.direction
@@ -126,23 +157,54 @@ class SnakeGame:
         right = (head[0] + dir_right[0], head[1] + dir_right[1])
         left  = (head[0] + dir_left[0],  head[1] + dir_left[1])
 
+        #odległość do jedzenia - odrazu znormalizowana do [-1;1] - ujemne zachowuja informacje o kierunku
+        food_dx = (self.food[0] - head[0]) / self.size
+        food_dy = (self.food[1] - head[1]) / self.size
+
+        # odległość do ściany w trzech kierunkach (względnych)
+        def wall_distance(dir_x, dir_y):
+            '''Ile kroków od głowy do ściany w danym kierunku.'''
+            steps = 0
+            x, y = head
+            while True:
+                x += dir_x
+                y += dir_y
+                if x < 0 or x >= self.size or y < 0 or y >= self.size:
+                    break
+                steps += 1
+            return steps / self.size   #normalizacja [0;1]
+
+        wall_ahead = wall_distance(dx, dy)
+        wall_right = wall_distance(dir_right[0], dir_right[1])
+        wall_left  = wall_distance(dir_left[0], dir_left[1])
+
+
         state = [
-            # grupa 1: niebezpieczeństwo
+            #grupa 1: niebezpieczeństwo
             self._is_collision(ahead),
             self._is_collision(right),
             self._is_collision(left),
 
-            # grupa 2: kierunek (one-hot)
+            #grupa 2: kierunek
             dx == -1,   # lewo
             dx == 1,    # prawo
             dy == -1,   # góra
             dy == 1,    # dół
 
-            # grupa 3: gdzie jedzenie
+            #grupa 3: gdzie jedzenie
             self.food[0] < head[0],   # jedzenie na lewo
             self.food[0] > head[0],   # jedzenie na prawo
             self.food[1] < head[1],   # jedzenie wyżej (mniejsze y = wyżej)
             self.food[1] > head[1],   # jedzenie niżej
+
+            #grupa 4: odleglosc od jedznia
+            food_dx, # odl w poziomie
+            food_dy, # odl w pionie
+
+            #grupa 5: odleglosc od sciany
+            wall_ahead, # odl do sciany prosto
+            wall_right, # odl do sciany w prawo
+            wall_left # odl do sciany w lewo
         ]
 
         return state
@@ -160,7 +222,7 @@ class SnakeGame:
 
         '''
 
-        # zbuduj pustą planszę: lista list znaków
+        # pusta plansza: lista list znaków
         grid = [['.' for _ in range(self.size)] for _ in range(self.size)]
 
         #jedzonko
@@ -204,43 +266,26 @@ def absolute_to_relative(current_dir, desired_dir):
         return 1
     if desired_dir == left:
         return 2
-    return 0
+    return 0 # jesli jest taki jak aktualny to nic
 
 
+
+#można odpalić osobno do testów
+#nie ma to konfliktu z agentem i trenigniem
 if __name__ == "__main__":
-    import sys
+    game = SnakeGame(size=10)
+    print(game)
+    print('\nSterowanie: WSAD   wyjście: q')
 
-    mode = sys.argv[1] if len(sys.argv) > 1 else "play"
+    while not game.done:
+        cmd = input('> ').strip().lower()
+        if cmd == 'q': #wjście
+            break
+        if cmd not in KEYS: # jesli nie wsad
+            print('Nieznana komenda!')
+            continue
+        action = absolute_to_relative(game.direction, KEYS[cmd]) #zmiana dla czlwieka
+        game.step(action) #zaaplikowanie akcji
+        print(game) #wyświetlenie planszy po ruchu
 
-    if mode == "play":
-        game = SnakeGame(size=10)
-        print(game)
-        print('\nSterowanie: WSAD   wyjście: q')
-
-        while not game.done:
-            cmd = input('> ').strip().lower()
-            if cmd == 'q':
-                break
-            if cmd not in KEYS:
-                print('Nieznana komenda!')
-                continue
-            action = absolute_to_relative(game.direction, KEYS[cmd])
-            game.step(action)
-            print(game)
-
-        print('Koniec gry!')
-
-    elif mode == "test":
-        game = SnakeGame(size=10)
-        state = game.reset()
-        print(game)
-        print(f"stan startowy: {[int(s) for s in state]}")
-
-        actions = [0, 0, 0, 1, 0, 0]
-        for i, action in enumerate(actions):
-            state, reward, done = game.step(action)
-            print(f"krok {i+1}: action={action}  reward={reward:+d}  done={done}  len={len(game.snake)}")
-            if done:
-                break
-        print()
-        print(game)
+    print('Koniec gry!')
