@@ -15,16 +15,16 @@ class DQNAgent:
         self.action_size = action_size
 
         # hiperparametry
-        self.gamma = 0.9           #gamma - obniżanie nastęnpych nagród
+        self.gamma = 0.95           #gamma - obniżanie nastęnpych nagród
         self.epsilon = 1.0         #szansa na losową akcję (eksploracja)
         self.epsilon_min = 0.01    #minimum epsilonu
-        self.epsilon_decay = 0.995 #tempo spadku epsilonu
+        self.epsilon_decay = 0.998 #tempo spadku epsilonu
 
         #pamięć doświadczeń (replay buffer)
-        self.memory = deque(maxlen=100_000) # pamięta 100k ostatnich doświadczeń
+        self.memory = deque(maxlen=200_000) # pamięta 200k ostatnich doświadczeń
         #automatycznie wyrzuca najstarsze gdy się zapełni 
 
-        #100k bo jeden epizod to ok 50-200 kroków, 100k to 500-2000 epizodów.
+        #200k bo jeden epizod to ok 50-200 kroków, 200k to 1000-4000 epizodów.
 
         # sieć neuronowa
         self.model = self._build_model()
@@ -40,7 +40,8 @@ class DQNAgent:
         model = keras.Sequential([
             keras.layers.Input(shape=(self.state_size,)),
             keras.layers.Dense(128, activation='relu'),
-            keras.layers.Dense(128, activation='relu'),
+            keras.layers.Dense(64, activation='relu'),
+            keras.layers.Dense(32, activation='relu'),
             keras.layers.Dense(self.action_size),  # bez aktywacji - Q może być ujemne
         ])
         model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.001), loss='mse')

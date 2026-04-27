@@ -71,13 +71,26 @@ class SnakeGame:
 
         #5. sprawdzamy czy zjedlismy jedzenie
         if new_head == self.food:
-            self._place_food() #jesli tak to nowe jedzenie
             self.score += 1
             self.steps_since_food = 0
             reward = 10
+
+            # wygrana — wąż zajął całą planszę
+            if len(self.snake) >= self.size * self.size:
+                self.done = True
+                return self.get_state(), reward, self.done
+
+            self._place_food() #jesli tak to nowe jedzenie
+            
         else:
-            self.snake.pop() #jesli nie to usuwamy ogon
-            reward = 0
+            self.snake.pop()
+            #mala nagroda za zbliżanie się do jedzenia
+            old_dist = abs(head[0] - self.food[0]) + abs(head[1] - self.food[1])
+            new_dist = abs(new_head[0] - self.food[0]) + abs(new_head[1] - self.food[1])
+            if new_dist < old_dist:
+                reward = 1#bliżej jedzenia
+            else:
+                reward = -1#dalej od jedzenia
 
         return self.get_state(), reward, self.done
 

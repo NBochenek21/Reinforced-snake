@@ -1,13 +1,17 @@
 import json
-from game import SnakeGame
-from agent import DQNAgent
+import os
+from model.game import SnakeGame
+from model.agent import DQNAgent
 import random
 import numpy as np
+import sys
+import tensorflow as tf
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ''' 
 Tutaj łączymy grę z agenetem w pętle treningową.
 '''
-EPISODES = 1000 #ilość rund gry
-BATCH_SIZE = 32 #ile doświadczeń z pamieci losujemy na jedno uczenie
+EPISODES = 2000 #ilość rund gry
+BATCH_SIZE = 64 #ile doświadczeń z pamieci losujemy na jedno uczenie
 
 #zapewniamy powtarzalność wyników - faza testów
 random.seed(42)
@@ -49,7 +53,7 @@ try:# po to zeby ctrl C nie gubił danych
         if agent.epsilon > agent.epsilon_min: #epsilon decay - raz na epizod
             agent.epsilon *= agent.epsilon_decay
 
-        if ep % 100 == 0: #target model update - co 100 epizodow
+        if ep % 50 == 0: #target model update - co 100 epizodow
             agent.update_target_model()
 
         #zapisywanie historii modelu
@@ -63,8 +67,8 @@ try:# po to zeby ctrl C nie gubił danych
             agent.model.save('best_model.keras')
 
         if ep % 50 == 0:#infro do terminala co 50 epizodów
-            print(f"ep {ep:4d}  score: {env.score:2d}  best: {best_score:2d}  "
-                  f"eps: {agent.epsilon:.3f}  reward: {total_reward:+.0f}")
+            print(f"epizod {ep:4d} best: {best_score:2d}  "
+                  f"eps: {agent.epsilon:.3f}")
 
 except KeyboardInterrupt:
     print(f"\n\nPrzerwano na epizodzie {ep}!")

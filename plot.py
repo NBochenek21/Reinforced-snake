@@ -1,7 +1,10 @@
 import json
+import os
+import sys
 import matplotlib.pyplot as plt
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-with open('training_history.json', 'r') as f:
+with open('./results/exp4_multiple1.json', 'r') as f:
     history = json.load(f) # wczytujemy plik JSON do pythonowego słownika
 
 scores = history["scores"]
@@ -39,6 +42,6 @@ axes[2].set_ylabel('Epsilon')
 axes[2].set_xlabel('Epizod')
 
 plt.tight_layout()
-plt.savefig('training_plot.png', dpi=150)
+plt.savefig('./results/training_plot.png', dpi=150)
 plt.show()
 print("Wykres zapisany jako training_plot.png")

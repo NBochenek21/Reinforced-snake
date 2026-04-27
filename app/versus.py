@@ -2,10 +2,14 @@ import pygame
 import numpy as np
 import random
 import math
-from game import SnakeGame, absolute_to_relative, KEYS
-from tensorflow import keras
 import os
+import sys
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from model.game import SnakeGame, absolute_to_relative, KEYS
+from tensorflow import keras
 
 # konfiguracja 
 GRID_SIZE = 10 #rozmiar planszy
@@ -416,7 +420,7 @@ def run_game(screen, font, big_font, model, mode):
             screen.blit(lbl1, (left_x + 10, 5))
             draw_board(screen, game1, left_x, board_y, P1_COLOR, P1_HEAD, fruit_type=fruit1)
 
-            h_info = font.render(f"Score: {game1.score}  Len: {len(game1.snake)}", True, P1_HEAD)
+            h_info = font.render(f"Score: {game1.score}", True, P1_HEAD)
             screen.blit(h_info, (left_x + 10, board_y + BOARD_SIZE + 5))
 
         # AI / P2
@@ -429,7 +433,7 @@ def run_game(screen, font, big_font, model, mode):
         screen.blit(lbl2, (ai_x + 10, 5))
         draw_board(screen, game2, ai_x, board_y, p2_bc, p2_hc, fruit_type=fruit2)
 
-        a_info = font.render(f"Score: {game2.score}  Len: {len(game2.snake)}", True, p2_hc)
+        a_info = font.render(f"Score: {game2.score}", True, p2_hc)
         screen.blit(a_info, (ai_x + 10, board_y + BOARD_SIZE + 5))
 
         if game_over:
@@ -444,7 +448,9 @@ def run_game(screen, font, big_font, model, mode):
 # main
 
 def main():
-    model = keras.models.load_model('best_model.keras')
+    ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    model_path = os.path.join(ROOT, './results/base1.keras')
+    model = keras.models.load_model(model_path)
     print("Model zaladowany!")
 
     pygame.init() 
